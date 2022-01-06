@@ -12,16 +12,16 @@
 subsetCells <- function(
   ArchRProj = NULL, 
   cellNames = NULL
-  ){  
-
+){  
+  
   .validInput(input = ArchRProj, name = "ArchRProj", valid = c("ArchRProj"))
   .validInput(input = cellNames, name = "cellNames", valid = c("character"))
-
+  
   ccd <- getCellColData(ArchRProj)
   if(!all(cellNames %in% rownames(ccd))){
     stop("Not all cellNames in ArchRProject! Please re-check your input!")
   }
-
+  
   ArchRProj@cellColData <- ccd <- ccd[cellNames, , drop = FALSE]
   
   ArchRProj
@@ -41,45 +41,61 @@ subsetCells <- function(
 #' This `filterRatio` allows you to apply a consistent filter across multiple different samples that may have different
 #' percentages of doublets because they were run with different cell loading concentrations.
 #' The higher the `filterRatio`, the greater the number of cells potentially removed as doublets.
+#' @param sampleIDs This is a subset of sample IDs with which to selectively filter doublets
 #' @export
-filterDoublets <- function(ArchRProj = NULL, cutEnrich = 1, cutScore = -Inf, filterRatio = 1){
-
+filterDoublets <- function(ArchRProj = NULL,
+                           cutEnrich = 1,
+                           cutScore = -Inf,
+                           filterRatio = 1,
+                           sampleIDs = NULL){
+  
   .validInput(input = ArchRProj, name = "ArchRProj", valid = c("ArchRProj"))
   .validInput(input = cutEnrich, name = "cutEnrich", valid = c("numeric"))
   .validInput(input = cutScore, name = "cutScore", valid = c("numeric"))
   .validInput(input = filterRatio, name = "filterRatio", valid = c("numeric"))
-
+  
   if(any(grepl("filterDoublets", names(ArchRProj@projectSummary)))){
     stop("Already ran filterDoublets on ArchRProject! Cannot be re-ran on an ArchRProject!")
   }
-
+  
   df <- getCellColData(ArchRProj, c("Sample", "DoubletEnrichment", "DoubletScore"))
+  
+  if (!is.null(sampleIDs)) {
+    # check if sampleIDs are found in the ArchRProj
+    if (!all(sampleIDs %in% df$Sample)) {
+      message("Samples not found in ArchRProject: ", df$Sample[!sampleIDs %in% df$Sample])
+      stop("Not all sampleIDs found in ArchRProject!")
+    }
+  }
+  
   splitDF <- split(seq_len(nrow(df)), as.character(df$Sample))
-
+  
   cellsFilter <- lapply(splitDF, function(y){
-
+    
     x <- df[y, ,drop = FALSE]
 
     n <- nrow(x)
-
-    x <- x[order(x$DoubletEnrichment, decreasing = TRUE), ]
-    
-    if(!is.null(cutEnrich)){
-      x <- x[which(x$DoubletEnrichment >= cutEnrich), ]
-    } 
-    
-    if(!is.null(cutScore)){
-      x <- x[which(x$DoubletScore >= cutScore), ]
-    } 
-
-    if(nrow(x) > 0){
-      head(rownames(x), filterRatio * n * (n / 100000))
-    }else{
-      NULL
+    if(!is.null(sampleIDs)) {
+      if(unique(x$Sample) %in% sampleIDs) {
+        x <- x[order(x$DoubletEnrichment, decreasing = TRUE), ]
+        
+        if(!is.null(cutEnrich)){
+          x <- x[which(x$DoubletEnrichment >= cutEnrich), ]
+        } 
+        
+        if(!is.null(cutScore)){
+          x <- x[which(x$DoubletScore >= cutScore), ]
+        } 
+        
+        if(nrow(x) > 0){
+          head(rownames(x), filterRatio * n * (n / 100000))
+        }else{
+          NULL
+        }
+      }
     }
-
   }) %>% unlist(use.names=FALSE)
-
+  
   message("Filtering ", length(cellsFilter), " cells from ArchRProject!")
   tabRemove <- table(df[cellsFilter,]$Sample)
   tabAll <- table(df$Sample)
@@ -91,17 +107,16 @@ filterDoublets <- function(ArchRProj = NULL, cutEnrich = 1, cutScore = -Inf, fil
       message("\t", samples[i], " : ", 0, " of ", tabAll[samples[i]], " (0%)")
     }
   }
-
+  
   if(length(cellsFilter) > 0){
     
     ArchRProj@cellColData <- ArchRProj@cellColData[rownames(ArchRProj@cellColData) %ni% cellsFilter,,drop=FALSE]
-
+    
   }
   
   ArchRProj <- addProjectSummary(ArchRProj = ArchRProj, name = "filterDoublets", 
-    summary = c(cutEnrich = cutEnrich, cutScore = cutScore, filterRatio = filterRatio))
-
+                                 summary = c(cutEnrich = cutEnrich, cutScore = cutScore, filterRatio = filterRatio))
+  
   ArchRProj
-
+  
 }
-

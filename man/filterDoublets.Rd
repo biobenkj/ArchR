@@ -8,7 +8,8 @@ filterDoublets(
   ArchRProj = NULL,
   cutEnrich = 1,
   cutScore = -Inf,
-  filterRatio = 1
+  filterRatio = 1,
+  sampleIDs = NULL
 )
 }
 \arguments{
@@ -24,6 +25,8 @@ For example, if there are 5000 cells, the maximum would be \code{filterRatio * 5
 This \code{filterRatio} allows you to apply a consistent filter across multiple different samples that may have different
 percentages of doublets because they were run with different cell loading concentrations.
 The higher the \code{filterRatio}, the greater the number of cells potentially removed as doublets.}
+
+\item{sampleIDs}{This is a subset of sample IDs with which to selectively filter doublets}
 }
 \description{
 This function will filter doublets from an ArchRProject after addDoubletScores() has been run.
